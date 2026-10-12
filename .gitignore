@@ -1,0 +1,26 @@
+# Raw / cached dataset (large, regenerable via README instructions; not redistributed in the repo)
+data/extracted/
+data/iccad_official.rar
+data/cache/*.npz
+data/preprocess.log
+
+# Reference repo clone (external, not ours to redistribute)
+ref_repo/
+
+# Python
+__pycache__/
+*.pyc
+
+# Node (docx/pptx build tooling)
+report/node_modules/
+report/package-lock.json
+
+# LaTeX build artifacts
+report/*.aux
+report/*.log
+report/*.out
+report/*.toc
+
+# OS cruft
+.DS_Store
+Thumbs.db

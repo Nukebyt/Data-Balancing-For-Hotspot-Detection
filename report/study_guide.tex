@@ -1,0 +1,559 @@
+\documentclass[11pt]{article}
+\usepackage[margin=1in]{geometry}
+\usepackage{amsmath,amssymb}
+\usepackage{graphicx}
+\usepackage{xcolor}
+\usepackage{tcolorbox}
+\usepackage{enumitem}
+\usepackage{hyperref}
+\usepackage{titlesec}
+\usepackage{fancyhdr}
+\usepackage{booktabs}
+\usepackage{parskip}
+
+\definecolor{navy}{HTML}{1E2761}
+\definecolor{ice}{HTML}{CADCFC}
+\definecolor{red}{HTML}{E63946}
+\definecolor{lightgrey}{HTML}{F4F5F9}
+
+\tcbuselibrary{skins,breakable}
+
+\titleformat{\section}{\Large\bfseries\color{navy}}{\thesection}{0.5em}{}
+\titleformat{\subsection}{\large\bfseries\color{navy}}{\thesubsection}{0.5em}{}
+
+\pagestyle{fancy}
+\fancyhf{}
+\fancyhead[L]{\small\color{gray} Study Guide: Data Balancing for Hotspot Detection}
+\fancyhead[R]{\small\color{gray} Group 11}
+\fancyfoot[C]{\small\color{gray} \thepage}
+\renewcommand{\headrulewidth}{0.4pt}
+
+\newtcolorbox{keyidea}[1][]{
+  colback=lightgrey, colframe=navy, boxrule=0pt, leftrule=3pt,
+  arc=2pt, outer arc=2pt, fonttitle=\bfseries, title={#1},
+  coltitle=white, breakable
+}
+\newtcolorbox{analogy}[1][Analogy]{
+  colback=ice!30, colframe=navy!60, boxrule=0pt, leftrule=3pt,
+  arc=2pt, outer arc=2pt, fonttitle=\bfseries\itshape, title={#1},
+  coltitle=white, breakable
+}
+\newtcolorbox{takeaway}[1][Takeaway]{
+  colback=red!6, colframe=red, boxrule=0pt, leftrule=3pt,
+  arc=2pt, outer arc=2pt, fonttitle=\bfseries, title={#1},
+  coltitle=white, breakable
+}
+
+\title{\vspace{-1.5cm}\textbf{\color{navy}\Huge Study Guide}\\[0.3cm]
+\Large Data Balancing and Augmentation Strategies\\ for Lithography Hotspot Detection\\[0.3cm]
+\normalsize\itshape A beginner's walkthrough of the AI/ML concepts and the project itself, from zero prior knowledge}
+\author{Written for: Group 11 (Priyanuj Boruah, Kartik Aggarwal)\\ \small BEVD402L -- AI and Machine Learning for IC}
+\date{}
+
+\begin{document}
+\maketitle
+\thispagestyle{empty}
+
+\begin{keyidea}[How to use this guide]
+This is not the assignment report -- it is a plain-language explainer,
+written assuming you know \emph{nothing} about AI/ML going in. Read it
+top to bottom once, then use it as a reference when someone asks
+``wait, what does that actually mean?'' about any part of the project.
+Every technical term is introduced with a real-world analogy before
+it's used seriously.
+\end{keyidea}
+
+\newpage
+\tableofcontents
+\newpage
+
+\section{Part 1: AI and Machine Learning, From Zero}
+
+\subsection{What is ``Machine Learning'' really?}
+Ordinary computer programs work from rules a human writes: \emph{``if
+the temperature is above 30, turn on the fan.''} Machine learning (ML)
+flips this around. Instead of a human writing the rule, you show the
+computer thousands of examples, and it \emph{figures out the rule
+itself}.
+
+\begin{analogy}
+Imagine teaching a child to tell cats from dogs. You don't hand them a
+rulebook (``if it has pointy ears and whiskers and is under 40cm
+long...''). You just show them hundreds of photos, say ``cat'' or
+``dog'' each time, and eventually they start guessing correctly on
+photos they've never seen. That's exactly what machine learning does
+-- except the ``child'' is a mathematical model, and the ``photos''
+are training data.
+\end{analogy}
+
+\subsection{The two phases: Training and Testing}
+Every ML project has two distinct phases, and mixing them up is the
+single most common beginner mistake:
+
+\begin{itemize}[leftmargin=1.2em]
+    \item \textbf{Training} -- the model looks at examples \emph{with
+    the correct answer attached} (called \emph{labels}) and adjusts
+    itself to get better at predicting that answer.
+    \item \textbf{Testing (or evaluation)} -- the model is shown
+    \emph{new} examples it has never seen before, \emph{without} the
+    answer, and we check how many it gets right.
+\end{itemize}
+
+\begin{keyidea}[Why the split matters]
+If you test the model on the same examples it trained on, it can
+simply ``memorize'' the answers instead of actually learning the
+underlying pattern -- like a student who memorizes yesterday's exam
+questions verbatim instead of understanding the topic. That's called
+\textbf{overfitting}, and it's why every serious ML project keeps
+training data and test data strictly separate. In this project, this
+distinction is critical: we only ever apply our balancing/augmentation
+tricks to the \emph{training} data; the test data is always left
+exactly as it was found.
+\end{keyidea}
+
+\subsection{What is a Neural Network?}
+A neural network is one particular kind of ML model, loosely inspired
+by how brain cells (neurons) connect to each other. Don't worry about
+the biology -- think of it as a big mathematical function made of
+layers of simple building blocks, where:
+
+\begin{itemize}[leftmargin=1.2em]
+    \item Each ``neuron'' takes some numbers in, multiplies them by
+    learned weights, adds them up, and passes the result through a
+    simple non-linear switch (called an \textbf{activation
+    function}).
+    \item Layers of neurons are stacked, so the output of one layer
+    feeds into the next.
+    \item \textbf{Training} means slowly adjusting all those weights
+    (there can be thousands to billions of them) so that the
+    network's final output matches the correct label as often as
+    possible.
+\end{itemize}
+
+\begin{analogy}
+Think of a factory assembly line with many stations. Raw material
+(the image) enters at one end. Each station does a small
+transformation -- highlighting edges, detecting shapes, combining
+patterns -- and passes its output to the next station. By the final
+station, the ``product'' is a single decision: \emph{hotspot} or
+\emph{not a hotspot}. Training is the process of tuning every station
+on the line so the final product is usually correct.
+\end{analogy}
+
+\subsection{What is a CNN (Convolutional Neural Network)?}
+A CNN is a neural network specialized for images. The key building
+block is a \textbf{convolution}: a small sliding window (e.g.\ 3
+pixels by 3 pixels) that scans across the image looking for a specific
+small pattern -- an edge, a corner, a line of a certain thickness.
+Many such windows (called \textbf{filters}) run in parallel, each
+learning to detect a different small pattern.
+
+\begin{itemize}[leftmargin=1.2em]
+    \item \textbf{Convolution layer:} slides small filters over the
+    image to detect local patterns (edges, corners, textures).
+    \item \textbf{Pooling layer:} shrinks the image down (e.g.\ takes
+    the strongest signal in every 2$\times$2 block), which both
+    reduces computation and makes the network care less about exactly
+    \emph{where} a pattern appeared.
+    \item \textbf{Fully-connected layer:} at the very end, takes all
+    the detected patterns and combines them into a final decision.
+\end{itemize}
+
+Stacking several convolution+pooling stages lets early layers detect
+simple things (edges) and later layers combine those into complex
+things (a ``pinched wire'' shape that indicates a hotspot).
+
+\begin{keyidea}[Why CNNs, and not something simpler, for this project]
+A layout image is just a grid of pixels. A CNN is good at this task
+because a hotspot is defined by a \emph{local geometric pattern} (two
+lines getting too close together, a corner that's too sharp) --
+exactly the kind of small, spatial pattern that convolution filters
+are built to detect, wherever it appears in the image.
+\end{keyidea}
+
+\subsection{Binary Classification}
+Our task has exactly two possible answers: \emph{Hotspot (HS)} or
+\emph{Non-Hotspot (NHS)}. This is called \textbf{binary
+classification} (``binary'' = two options). The network's very last
+layer outputs a single number between 0 and 1 (think of it as ``how
+confident am I that this is a hotspot, from 0\% to 100\%''), and we
+typically call it a hotspot if that number is above 0.5.
+
+\subsection{Precision, Recall, and Why ``Accuracy'' Can Lie To You}
+This is the single most important idea for understanding this entire
+project, so we'll spend real time on it.
+
+\textbf{Accuracy} is the simplest possible score: what fraction of all
+predictions were correct? It sounds reasonable, but it has a fatal
+flaw when one class is much rarer than the other -- which is exactly
+our situation (see Part 3).
+
+\begin{analogy}
+Imagine a medical test for a rare disease that only 1 in 1,000 people
+actually have. A ``test'' that always says ``you're healthy,'' no
+matter what, will be correct 999 times out of 1,000 -- 99.9\%
+accuracy! But it is completely useless: it will never, ever catch the
+one person who is actually sick. High accuracy, zero usefulness.
+\end{analogy}
+
+This is precisely the trap in lithography hotspot detection: real
+hotspots are rare (Part 3), so a model that just says ``not a
+hotspot'' every single time can score above 99\% raw accuracy on some
+of our benchmarks while catching \emph{zero} real hotspots. That is
+why this whole project uses different scores instead:
+
+\begin{itemize}[leftmargin=1.2em]
+    \item \textbf{Recall (a.k.a.\ Sensitivity):} of all the
+    \emph{actual} hotspots, what fraction did we correctly catch?
+    This is the ``did we miss the disease'' score.
+    \item \textbf{Specificity:} of all the actual \emph{non}-hotspots,
+    what fraction did we correctly leave alone? This is the ``did we
+    cry wolf'' score.
+    \item \textbf{Precision:} of everything we \emph{flagged} as a
+    hotspot, what fraction actually were? High precision means few
+    false alarms.
+    \item \textbf{Balanced Accuracy:} the average of Recall and
+    Specificity. This is the project's main scorecard, precisely
+    because it can't be gamed by just always predicting the majority
+    class -- to score well, a model must do well on \emph{both}
+    classes.
+    \item \textbf{F1-score:} a combined score balancing Precision and
+    Recall, useful when you care about both false alarms and missed
+    detections together.
+\end{itemize}
+
+\begin{keyidea}[The Confusion Matrix]
+All of the above scores come from just four numbers, usually laid out
+in a $2\times2$ grid called a \textbf{confusion matrix}:
+\begin{center}
+\begin{tabular}{ll|c|c}
+ & & \multicolumn{2}{c}{\textbf{Model Predicted}} \\
+ & & Hotspot & Non-Hotspot \\ \hline
+\textbf{Actually} & Hotspot & True Positive (TP) & False Negative (FN) \\
+\textbf{Was} & Non-Hotspot & False Positive (FP) & True Negative (TN) \\
+\end{tabular}
+\end{center}
+FN (a real hotspot we missed) is usually the most dangerous error in
+this domain -- it slips through to manufacturing. FP (a false alarm)
+just costs some wasted verification time.
+\end{keyidea}
+
+\section{Part 2: The Real-World Problem -- Lithography Hotspots}
+
+\subsection{How is a computer chip made?}
+A modern chip has billions of microscopic wires and transistors
+packed onto a few square centimeters of silicon. The pattern of these
+wires is ``printed'' onto the silicon using a process called
+\textbf{photo-lithography} -- shining light through a stencil (called
+a \textbf{mask}) coated with the desired circuit pattern, similar in
+spirit to how a photographic negative projects an image, but at a
+scale of billionths of a metre.
+
+\subsection{What is a ``hotspot''?}
+As chip features get smaller and smaller, they start to approach the
+same size as the \emph{wavelength of light} being used to print them.
+When a wire (or the gap between two wires) is on the edge of what the
+light can reliably resolve, small pattern variations can cause a real
+manufacturing defect:
+
+\begin{itemize}[leftmargin=1.2em]
+    \item \textbf{Pinching (open circuit):} two ends of a wire that
+    were supposed to connect end up separated -- like a bridge that
+    doesn't quite meet in the middle.
+    \item \textbf{Bridging (short circuit):} two separate wires that
+    were supposed to stay apart end up merging together -- like two
+    lanes of a highway accidentally merging.
+\end{itemize}
+
+A \textbf{hotspot} is a small region of the chip layout that is at
+high risk of one of these failures once actually printed. Figure~1 of
+the reference paper shows real examples: a design's intended pattern
+(``Original'') next to what actually got printed (``Printed''), with
+the defect circled.
+
+\begin{keyidea}[Why we bother detecting these early]
+Finding a hotspot \emph{after} manufacturing means the chip is
+already defective -- expensive, wasted silicon. Finding it during
+\emph{design}, before sending the layout to the fab, means engineers
+can just tweak that one small region and re-check, which is far
+cheaper. The gold-standard way to check is full optical simulation of
+how light will behave -- but that is slow and computationally very
+expensive to run across an entire chip. This project (like the wider
+field it belongs to) is about using a fast, approximate, ML-based
+screening step to flag \emph{likely} hotspots quickly, so full
+simulation only needs to double-check the suspicious regions.
+\end{keyidea}
+
+\subsection{The ICCAD-12 Dataset}
+To let researchers compare their methods fairly, a standard
+benchmark dataset was released in 2012, called \textbf{ICCAD-12}. It
+contains five separate collections (``Benchmark 1'' through
+``Benchmark 5''), each a set of small image clips cut from real chip
+layouts, where every clip is labeled either Hotspot (HS) or
+Non-Hotspot (NHS). This is the exact dataset our whole project uses,
+and it is what makes results from different student groups (and
+different research papers) directly comparable.
+
+\section{Part 3: Our Specific Problem -- Class Imbalance}
+
+\subsection{What does ``imbalanced'' mean here?}
+In the real world, the overwhelming majority of any chip design is
+completely fine -- hotspots are, by definition, rare exceptions. This
+shows up directly in the dataset:
+
+\begin{center}
+\begin{tabular}{lccc}
+\toprule
+Benchmark & Hotspot images & Non-Hotspot images & Ratio \\
+\midrule
+B1 & 226  & 4{,}679  & 1 hotspot per 21 images \\
+B2 & 498  & 41{,}298 & 1 hotspot per 83 images \\
+B3 & 1{,}808 & 46{,}333 & 1 hotspot per 26 images \\
+B4 & 177  & 31{,}890 & 1 hotspot per 180 images \\
+B5 & 41   & 19{,}327 & 1 hotspot per \textbf{471} images \\
+\bottomrule
+\end{tabular}
+\end{center}
+
+On Benchmark 5, for every single real hotspot, there are 471
+non-hotspot images. This is what we mean by \textbf{severe class
+imbalance}, and it is the central obstacle this whole project is
+about.
+
+\begin{analogy}
+Imagine trying to teach someone to recognize a rare bird species by
+showing them 471 pictures of pigeons for every 1 picture of the rare
+bird. If they just learned to say ``pigeon'' every single time, they'd
+be right 99.8\% of the time -- and would never learn to recognize the
+rare bird at all. A neural network trained naively on this kind of
+data has exactly the same temptation: predicting the majority class
+every time is a very easy way to rack up high raw accuracy.
+\end{analogy}
+
+\subsection{Why does this matter for training, specifically?}
+Neural networks learn by seeing many examples and gradually reducing
+their mistakes. If 99.8\% of what they see is one class, the easiest
+way to reduce mistakes is to just lean heavily towards predicting that
+class -- the rare class barely gets enough ``votes'' during training
+to matter. Our project's whole job is to fix this imbalance in the
+\emph{training data} so the model actually has to learn what a real
+hotspot looks like.
+
+\section{Part 4: The Six Strategies We Compared}
+This is Group 11's specific research angle: \emph{comparing different
+ways of fixing the training data's imbalance}, to see which works
+best. Here is each strategy explained with a plain-language analogy.
+
+\begin{keyidea}[0. Baseline -- Do Nothing]
+Train on the data exactly as it comes, imbalance and all. This is our
+reference point -- every other strategy is judged by how much (or how
+little) it improves on this.
+\end{keyidea}
+
+\begin{keyidea}[1. Random Undersampling (RUS)]
+\textbf{Idea:} Throw away most of the majority (non-hotspot) examples
+until the two classes are more equal in number.
+\begin{analogy}
+If you have 4,700 pigeon photos and 226 rare-bird photos, just
+randomly delete pigeon photos until you have roughly 226 of each. Now
+the training set is balanced -- but you've thrown away a lot of
+pigeon photos you could have learned from, and you haven't added a
+single new rare-bird photo.
+\end{analogy}
+\textbf{Risk:} If the rare class had very few examples to begin with,
+you end up with a tiny total training set, and the model may not have
+enough information to learn from at all.
+\end{keyidea}
+
+\begin{keyidea}[2. Random Oversampling (ROS)]
+\textbf{Idea:} Instead of deleting majority examples, duplicate
+minority (hotspot) examples until the classes are more equal.
+\begin{analogy}
+Instead of deleting pigeon photos, make 20 identical copies of each
+rare-bird photo you have, so the count matches. You keep everything,
+but the rare-bird photos are now exact repeats.
+\end{analogy}
+\textbf{Risk:} The model might start ``memorizing'' those exact
+duplicated images rather than learning the general pattern --
+overfitting to a small handful of examples.
+\end{keyidea}
+
+\begin{keyidea}[3. Oversampling + Augmentation]
+\textbf{Idea:} Same as ROS, but instead of making \emph{identical}
+copies, apply small, label-preserving changes to each duplicate --
+flipping it left-right, flipping it top-bottom, or rotating it 90/180/
+270 degrees.
+\begin{analogy}
+Instead of 20 identical photocopies of the same rare bird photo, you
+make 20 copies but mirror some, flip some upside down, and rotate
+some. It's still recognizably the same bird, but the model sees more
+\emph{variety}, making it a little harder to just memorize pixels.
+\end{analogy}
+\textbf{Why flips/rotations specifically?} A hotspot is still a
+hotspot if you flip or rotate the whole image -- it's the same
+physical pattern, just viewed from a different orientation, so this
+doesn't create fake/incorrect examples.
+\end{keyidea}
+
+\begin{keyidea}[4. Balanced Mini-Batch Sampling]
+\textbf{Idea:} Don't touch the dataset at all. Instead, change how
+training examples are \emph{picked} in each small batch during
+training, so that every batch shown to the model has roughly equal
+hotspot and non-hotspot examples.
+\begin{analogy}
+Instead of editing your photo collection, you change how you
+\emph{study} it: every study session, you deliberately pull an equal
+number of pigeon and rare-bird photos from your (untouched, full)
+collection. No photo was deleted or copied -- you just changed your
+study habits.
+\end{analogy}
+\textbf{Why this often works well:} it gets the benefit of balanced
+exposure during training without physically discarding data (like
+RUS) or risking memorized duplicates (like ROS).
+\end{keyidea}
+
+\begin{keyidea}[5. Combined Strategy]
+\textbf{Idea:} Do a bit of both -- moderately reduce the majority
+class \emph{and} moderately increase the (augmented) minority class,
+meeting somewhere in the middle, rather than going to either extreme.
+\end{keyidea}
+
+\section{Part 5: What We Actually Built}
+
+\begin{enumerate}[leftmargin=1.3em]
+    \item \textbf{Got the real data.} Downloaded the actual ICCAD-12
+    dataset (all five benchmarks, tens of thousands of real layout
+    images) and confirmed the hotspot/non-hotspot counts matched the
+    published reference paper.
+    \item \textbf{Built one shared ``brain''.} Implemented a single
+    lightweight CNN (about 8,600 tunable numbers -- tiny by modern AI
+    standards, deliberately so it trains fast) that every strategy
+    uses identically. This is important: if every strategy uses the
+    exact same network, any performance difference we see must come
+    from the \emph{training data} itself, not from a better or worse
+    network design. That is what makes this a fair, controlled
+    experiment.
+    \item \textbf{Implemented all six strategies} as code, each one
+    taking the raw imbalanced training images in and handing back a
+    (possibly resampled/augmented) training set, never touching the
+    test images.
+    \item \textbf{Trained and tested 105 times.} 5 benchmarks
+    $\times$ 6 strategies = 30 main experiments, plus 75 more
+    experiments where we varied \emph{how strongly} to rebalance the
+    data (to see if going halfway is better than going all the way).
+    \item \textbf{Measured everything that matters.} For every one of
+    those 105 runs, we recorded the full confusion matrix, balanced
+    accuracy, precision, recall, specificity, and F1-score -- never
+    just raw accuracy, for the reasons explained in Part 1.
+    \item \textbf{Turned the numbers into pictures and a paper.}
+    Generated charts and tables, and wrote them up as a proper
+    IEEE-style research report.
+\end{enumerate}
+
+\section{Part 6: What We Found -- Explained Simply}
+
+\subsection{Headline result}
+Averaged across all five benchmarks:
+
+\begin{center}
+\begin{tabular}{lc}
+\toprule
+Strategy & Average Balanced Accuracy \\
+\midrule
+Balanced Mini-Batch Sampling & \textbf{0.945 (best)} \\
+Combined & 0.926 \\
+Random Oversampling & 0.923 \\
+Oversampling + Augmentation & 0.887 \\
+Baseline (do nothing) & 0.844 \\
+Random Undersampling & \textbf{0.779 (worst)} \\
+\bottomrule
+\end{tabular}
+\end{center}
+
+In plain terms: \textbf{just re-sampling which examples get shown to
+the model in each training batch (Strategy \#4) worked better, on
+average, than any other trick} -- including fancier ones that alter
+the dataset itself. And somewhat surprisingly, \textbf{the strategy
+that most directly ``fixes'' the imbalance by deleting data
+(undersampling) was actually the single worst performer.}
+
+\subsection{The most dramatic finding: Benchmark 5}
+Benchmark 5 is the extreme case -- only 26 real hotspot training
+images, against 2,716 non-hotspot ones. Here's what happened:
+
+\begin{itemize}[leftmargin=1.2em]
+    \item \textbf{Random Undersampling:} caught \textbf{0} of 41 real
+    hotspots in the test set. It predicted ``not a hotspot'' every
+    single time, no matter what we fed it -- even though we had
+    artificially balanced its training set to 50/50! We even tried
+    every possible balance level (from mild to full) and it stayed
+    stuck at 0 hotspots caught, every time.
+    \item \textbf{Balanced Mini-Batch Sampling:} caught \textbf{40 of
+    41} real hotspots (97.6\% recall).
+\end{itemize}
+
+\begin{takeaway}
+Why did undersampling fail so badly? Because it only ever had 26
+\emph{original} hotspot images to work with -- deleting non-hotspot
+images doesn't create a single new piece of information about what a
+hotspot looks like. If you only ever show a child 26 photos of a rare
+bird, no amount of throwing away pigeon photos will suddenly teach
+them what that bird looks like. The lesson: \textbf{when data is
+critically scarce, the fix has to add information (or at least
+preserve all of it), not just remove the competing class.}
+\end{takeaway}
+
+\subsection{A genuinely surprising finding: augmentation can backfire}
+We expected ``oversampling + augmentation'' (Strategy \#3) to always
+beat plain oversampling (Strategy \#2), since flipping/rotating adds
+variety. That was true on Benchmarks 2 and 3 (augmentation clearly
+helped). But on Benchmark 5 -- the one with only 26 original hotspot
+images -- augmentation actually made things \emph{worse} than plain
+duplication (balanced accuracy 0.707 vs.\ 0.914).
+
+\begin{takeaway}
+When you have very few original examples, almost every hotspot image
+the network sees during training ends up being a flipped/rotated copy
+of one of those few originals. The model can end up learning quirks
+of the flipping/rotating process itself, rather than the real
+geometric pattern of a hotspot -- and that hurts it on the real
+(unflipped) test images. \textbf{The lesson: a technique that helps in
+one setting can hurt in another -- there's no single ``best''
+strategy that works everywhere, which is exactly the nuanced answer
+our research question was looking for.}
+\end{takeaway}
+
+\subsection{What the confusion matrix numbers mean, concretely}
+On Benchmark 2, the do-nothing baseline caught only 197 of 498 real
+hotspots (missed 301!) while being extremely cautious about false
+alarms. Switching to the Combined strategy caught 495 of 498 real
+hotspots, at the cost of a modest number of extra false alarms (415
+non-hotspots incorrectly flagged, out of 41,713 total). In a
+real manufacturing context, missing 301 real defects is a far more
+expensive mistake than double-checking 415 patterns that turned out
+to be fine -- which is exactly the kind of trade-off Balanced Accuracy
+(and the confusion matrix) is designed to make visible.
+
+\section{Glossary (Quick Reference)}
+\begin{description}[leftmargin=1.6em, style=nextline]
+\item[Accuracy] Fraction of all predictions that were correct. Misleading when classes are imbalanced.
+\item[Balanced Accuracy] Average of Recall and Specificity; the fair scorecard used throughout this project.
+\item[Baseline] Training with no balancing intervention -- the reference point.
+\item[Class imbalance] When one label (here, non-hotspot) vastly outnumbers the other (hotspot) in the data.
+\item[CNN (Convolutional Neural Network)] A neural network specialized for images, using sliding filters to detect local visual patterns.
+\item[Confusion matrix] The 2$\times$2 table of TP/FP/FN/TN counts that every other metric is computed from.
+\item[Data augmentation] Creating variations of existing examples (e.g.\ flips, rotations) to add diversity without collecting new data.
+\item[F1-score] Combined score balancing Precision and Recall.
+\item[Hotspot (HS)] A layout region at high risk of a real manufacturing defect once printed.
+\item[Non-Hotspot (NHS)] A layout region that is expected to print correctly.
+\item[Oversampling] Duplicating minority-class examples to reduce imbalance.
+\item[Overfitting] When a model memorizes training examples instead of learning general patterns, and performs worse on new data.
+\item[Precision] Of everything flagged positive, what fraction was correct.
+\item[Recall (Sensitivity)] Of all real positives, what fraction was correctly caught.
+\item[Specificity] Of all real negatives, what fraction was correctly left alone.
+\item[Test set] Data held back and never used for training, used only to check final performance.
+\item[Training set] Data (with correct labels) shown to the model so it can learn.
+\item[Undersampling] Discarding majority-class examples to reduce imbalance.
+\end{description}
+
+\end{document}
