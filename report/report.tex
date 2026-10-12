@@ -31,29 +31,40 @@
 Lithography hotspot detection is a binary classification problem in
 which the number of hotspot (HS) layout patterns is vastly outnumbered
 by non-hotspot (NHS) patterns, with imbalance ratios exceeding 400:1 on
-some ICCAD-12 benchmarks. This severe skew means a classifier can
-achieve high raw accuracy while missing almost every real hotspot --
-exactly the failure mode a manufacturing screening tool cannot afford.
-This work systematically compares six training-data strategies --
-no balancing (baseline), random undersampling, random oversampling,
-oversampling with augmentation, balanced mini-batch sampling, and a
-combined under/oversampling strategy -- using an identical lightweight
-convolutional backbone, on all five ICCAD-12 benchmarks independently.
-We report balanced accuracy, precision, recall/sensitivity,
-specificity, F1-score and the full confusion matrix per benchmark and
-on average, and additionally run a class-ratio ablation study that
-quantifies the recall/specificity trade-off as the training
-distribution is progressively re-balanced. Our results show that
-balanced mini-batch sampling gives the strongest and most consistent
-improvement (average balanced accuracy 0.945 vs.\ 0.844 for the
-imbalanced baseline), that plain random undersampling is actually the
-\emph{worst}-performing strategy on average and collapses to 0\%
-hotspot recall on the most extreme benchmark, and that augmenting the
-minority class helps on moderately imbalanced benchmarks but actively
-hurts on the most severely imbalanced one -- confirming that
-\emph{how} and \emph{how much} a class distribution is altered matters
-as much as \emph{whether} it is altered at all, and that the best
-strategy is benchmark-dependent rather than universal.
+some ICCAD-12 benchmarks, so a classifier can reach high raw accuracy
+while missing almost every real hotspot. This work compares eight
+training-data strategies (no balancing, random undersampling, random
+oversampling, oversampling with augmentation, balanced mini-batch
+sampling, and three combined variants) using an identical lightweight
+convolutional backbone, on all five ICCAD-12 benchmarks independently,
+under three random seeds with paired statistical significance testing.
+This is a revised submission. Our original analysis trained every
+strategy for a fixed number of epochs and selected no hyperparameters
+on a held-out split, and reviewer feedback correctly identified this
+as conflating strategy effects with an unequal number of gradient
+updates per strategy. We fixed it: equal gradient-update steps for
+every strategy, checkpoint selection on a validation split, and the
+test split touched exactly once. Under that corrected protocol, the
+large differences in balanced accuracy we originally reported mostly
+disappear, and no pairwise strategy comparison reaches statistical
+significance on balanced accuracy. A threshold-free ranking metric,
+PR-AUC, recovers real, statistically significant structure instead:
+oversampling-based strategies significantly outperform RUS ($p<0.05$).
+A per-step learning-curve analysis explains why: RUS's apparent
+collapse in our original submission was a training-protocol artifact.
+It memorizes its small resampled pool almost immediately, and once
+evaluated at the correct, validation-selected checkpoint, it performs
+competitively on balanced accuracy while remaining measurably worse on
+PR-AUC. We also justify our augmentation choices on physical grounds
+(Manhattan-geometry closure under rotation/reflection, and the
+local-geometry dependence of the lithography diffraction mechanism),
+and compare our aggregate results against published ICCAD-12 detectors.
+The revised conclusion is more cautious than our original one: under
+fair training conditions, balancing-strategy choice has a smaller
+effect on balanced accuracy than we first claimed, and researchers in
+this area should check a threshold-free ranking metric and a
+controlled training budget before concluding that any one strategy
+fails mechanistically.
 \end{abstract}
 
 \begin{IEEEkeywords}
@@ -64,7 +75,7 @@ lithography hotspot detection, class imbalance, data augmentation, oversampling,
 Photo-lithography is the dominant patterning technology used in
 semiconductor manufacturing, but as process nodes shrink well below
 the lithographic wavelength, certain layout geometries become
-susceptible to printing failures known as \emph{hotspots} -- pinching
+susceptible to printing failures known as \emph{hotspots}: pinching
 (open-circuit) or bridging (short-circuit) defects that reduce
 manufacturing yield. Detecting hotspots early, at the design stage,
 avoids costly re-spins and mask corrections. Full lithography
@@ -75,13 +86,13 @@ can flag suspect layout clips quickly \cite{borisov2018,yang2017shallow}.
 The ICCAD-2012 Contest benchmark \cite{torres2012iccad} is the most widely used
 public dataset for this task. It consists of five benchmarks of
 layout-pattern image clips labeled hotspot (HS) or non-hotspot (NHS).
-A defining characteristic of this dataset -- and of hotspot detection
-in general -- is severe class imbalance: hotspot patterns are rare by
+A defining characteristic of this dataset, and of hotspot detection in
+general, is severe class imbalance: hotspot patterns are rare by
 construction, since most of a design is manufacturable. On the five
 ICCAD-12 benchmarks used in this work, the test-set imbalance ratio
 ranges from roughly 21:1 up to over 470:1 (Table~\ref{tab:dataset}).
 Under such skew, a trivial classifier that always predicts NHS can
-exceed 99\% raw accuracy while catching zero hotspots -- which is why
+exceed 99\% raw accuracy while catching zero hotspots, which is why
 the assignment brief, and this study, use \emph{balanced accuracy}
 (the average of recall and specificity) as the primary metric, in
 addition to reporting the full confusion matrix.
@@ -96,23 +107,40 @@ strategy provides the most effective improvement for highly imbalanced
 ICCAD-12 hotspot detection?} We hold the classification backbone fixed
 and treat the \emph{training-data distribution} as the sole
 experimental variable, isolating its effect from architectural
-choices -- which is the appropriate controlled-experiment design for
+choices; this is the appropriate controlled-experiment design for
 this research question.
 
-Our contributions are:
+This is a revised submission that directly addresses reviewer feedback
+on our original (DA2) analysis, which trained every strategy for a
+fixed number of epochs with no held-out validation split and a single
+training seed. Our contributions are:
 \begin{enumerate}
-    \item A controlled, five-benchmark comparison of six data-level
+    \item A controlled, five-benchmark comparison of eight data-level
     balancing/augmentation strategies (undersampling, oversampling,
-    augmented oversampling, balanced-batch sampling, and a combined
-    strategy) against the natural-imbalance baseline, using an
-    identical lightweight CNN and evaluation protocol.
+    augmented oversampling, balanced-batch sampling, and three combined
+    variants) against the natural-imbalance baseline, using an
+    identical lightweight CNN, an equalised gradient-update-step
+    training protocol, and validation-based checkpoint selection.
+    \item A 3-seed experimental protocol with paired significance
+    testing, and PR-AUC as a threshold-free companion to balanced
+    accuracy, both added in direct response to feedback. Together
+    they reveal that most DA2-reported strategy differences on
+    balanced accuracy were not statistically significant, while
+    real, significant differences on PR-AUC had been hidden by a
+    fixed-threshold evaluation.
+    \item A mechanistic, learning-curve-based explanation
+    (Section~\ref{sec:mechanism}) for why random undersampling appeared
+    to fail outright in our DA2 submission, and a physically-grounded
+    justification (Section~\ref{sec:physical-aug}) for the
+    label-preserving augmentations used throughout.
     \item A class-ratio ablation study that sweeps the target HS:NHS
     ratio and quantifies how recall trades off against specificity and
     balanced accuracy as the training distribution is progressively
-    altered, for three representative strategies.
+    altered, for three representative strategies, plus a comparison
+    against published ICCAD-12 results (Section~\ref{sec:published}).
     \item An open, reproducible implementation (Section~\ref{sec:repro})
-    with cached preprocessing, a documented experiment grid, and
-    generated figures/tables for all reported results.
+    with cached preprocessing, a documented multi-seed experiment grid,
+    and generated figures/tables for all reported results.
 \end{enumerate}
 
 \section{Related Work}
@@ -140,7 +168,7 @@ our work (and the reference baseline we build on) continues.
 classical classifiers against a custom lightweight CNN trained from
 scratch on the ICCAD-12 benchmarks, finding that the lightweight CNN
 achieves both higher balanced accuracy and roughly 29$\times$ faster
-inference -- this is the reference/baseline architecture family we
+inference; this is the reference/baseline architecture family we
 adopt in this work. \cite{liao2022transfer} similarly investigates
 transfer learning with pretrained deep CNN feature extractors, and
 \cite{chen2019inception} widens the backbone with a double-inception
@@ -148,7 +176,7 @@ architecture to reduce false alarms. Most directly relevant to our
 research question, \cite{yang2017imbalance} explicitly identifies
 class imbalance as the central obstacle to reliable CNN-based hotspot
 detection and mitigates it with minority-class upsampling combined
-with mirror-flip augmentation -- independently arriving at the same
+with mirror-flip augmentation, independently arriving at the same
 flip-based augmentation choice we justify physically in
 Section~\ref{sec:physical-aug}, and the closest prior work to Group
 11's assigned research question. \cite{yang2019biased} instead
@@ -160,13 +188,13 @@ research angle in this course's broader project set).
 \cite{ye2019lithoroc} observes that accuracy and false-alarm counts
 become unreliable under severe class imbalance and proposes training
 with an explicit ROC-optimizing surrogate loss instead of plain
-cross-entropy -- independent motivation, from within the hotspot
-detection literature itself, for reporting a threshold-free ranking
+cross-entropy. That is independent motivation, from within the
+hotspot detection literature itself, for reporting a threshold-free ranking
 metric such as the PR-AUC we add in
 Section~\ref{sec:eval}. \cite{wang2021gan} augments the minority
 hotspot class with a GAN rather than geometric transforms, reporting
 up to 3\% accuracy improvement at matched false-alarm rate against
-conventional augmentation -- a generative alternative to the
+conventional augmentation, a generative alternative to the
 label-preserving transforms we use. Section~\ref{sec:published}
 compares our results against the aggregate numbers reported by
 \cite{huang2021enhancements} and \cite{lin2025yolov5}, two more recent
@@ -188,9 +216,9 @@ augmented-oversampling strategy we study here. Cost-sensitive learning
 to all of the above data-level strategies. \cite{buda2018systematic}
 is a systematic empirical study of class imbalance specifically in
 CNNs (across MNIST, CIFAR, and ImageNet-derived benchmarks) and finds
-oversampling to be the most consistently effective and robust
-remedy among several resampling/cost-sensitive methods tested -- direct
-supporting evidence, from outside the lithography domain, for why
+oversampling to be the most consistently effective remedy among
+several resampling/cost-sensitive methods tested, supporting evidence
+from outside the lithography domain for why
 oversampling-based strategies (ROS, ROS+Aug, Combo) perform well in
 our results. \cite{he2009imbalanced}, \cite{krawczyk2016challenges} and
 \cite{branco2016survey} survey the broader resampling, cost-sensitive,
@@ -232,8 +260,8 @@ alongside dropout as a standard overfitting countermeasure for CNNs,
 and \cite{simard2003bestpractices} is the classical argument that
 label-preserving geometric transforms improve generalization
 specifically for structured, rectilinear visual patterns (there,
-scanned documents) -- a close methodological analogy to the Manhattan-
-geometry layout clips in this work, and part of the physical
+scanned documents), a close methodological analogy to the
+Manhattan-geometry layout clips in this work and part of the physical
 justification we give in Section~\ref{sec:physical-aug}.
 \cite{cubuk2019autoaugment} instead searches for an augmentation
 policy automatically rather than choosing transforms by hand, a
@@ -317,7 +345,7 @@ fully-connected(10, ReLU) $\rightarrow$ fully-connected(1, sigmoid).
 We re-implemented this backbone in PyTorch (the reference used
 Keras/TensorFlow) and re-scaled the input from $224{\times}224{\times}3$
 to $64{\times}64{\times}1$ (single-channel grayscale) so that the full
-experiment grid (now substantially larger than in our DA2 submission --
+experiment grid (now substantially larger than in our DA2 submission;
 see below) remains tractable on CPU-only hardware. This keeps the
 model in the same lightweight parameter regime as the reference
 (8{,}649 vs.\ 12{,}873 trainable parameters) while enabling every
@@ -334,13 +362,13 @@ Reviewers correctly pointed out that this is not a fair comparison:
 because the strategies change the physical size of the training set
 (RUS shrinks it, ROS/ROS+Aug/Combo grow it, balanced-batch sampling
 leaves it unchanged), ``8 epochs'' corresponds to a very different
-\emph{number of gradient updates} per strategy -- a strategy trained on
+\emph{number of gradient updates} per strategy: a strategy trained on
 a smaller resampled set simply sees far fewer mini-batches per epoch.
 We now fix the number of gradient-update \emph{steps} instead of
 epochs. For each benchmark, we compute
 $T = \lceil n_{\text{baseline}} / 32 \rceil \times 8$, where
 $n_{\text{baseline}}$ is the natural (untouched) training-set size for
-that benchmark and 32 is the batch size -- i.e.\ $T$ is simply what
+that benchmark and 32 is the batch size, i.e.\ $T$ is simply what
 ``8 epochs'' meant for the baseline strategy on that benchmark. Every
 strategy, regardless of how much it has resampled the training set,
 is then trained for exactly $T$ steps (the training DataLoader is
@@ -383,8 +411,8 @@ images in that training pool.
   \item \textbf{Oversampling + Augmentation (ROS+Aug).} Identical to
   ROS, except every \emph{duplicated} hotspot sample (the original copy
   of each hotspot image is always seen unmodified at least once) is
-  passed through one randomly chosen label-preserving transform --
-  horizontal flip, vertical flip, or a 90/180/270-degree rotation --
+  passed through one randomly chosen label-preserving transform
+  (horizontal flip, vertical flip, or a 90/180/270-degree rotation),
   applied on-the-fly at load time, so the network never sees an exact
   pixel-identical duplicate. Section~\ref{sec:physical-aug} justifies
   why these specific transforms are physically valid for this domain.
@@ -403,7 +431,7 @@ images in that training pool.
   same idea as Combined, but with a milder majority-class reduction
   (down to 75\% retained rather than 50\%), to test whether the
   combined strategy's behavior is sensitive to how aggressively the
-  majority class is trimmed -- DA3 feedback explicitly asked us to
+  majority class is trimmed. DA3 feedback explicitly asked us to
   ``test combined strategies'' (plural), and comparing these two
   variants is our answer.
   \item \textbf{Combined (Balanced-Batch + Augmentation).} A third,
@@ -419,7 +447,7 @@ images in that training pool.
 \label{sec:physical-aug}
 DA3 feedback asked us to justify, physically rather than just
 empirically, why flipping and 90-degree rotation are valid
-label-preserving transforms for lithography layout clips -- i.e.\ why
+label-preserving transforms for lithography layout clips, i.e.\ why
 we are confident a flipped or rotated hotspot clip is still a hotspot.
 Three arguments support this choice:
 
@@ -429,7 +457,7 @@ Three arguments support this choice:
   grid: every edge is horizontal or vertical, by design-rule
   construction. A 90/180/270-degree rotation or a horizontal/vertical
   flip maps horizontal edges to vertical edges and vice versa, but
-  introduces no new edge angle -- the transformed clip is still a
+  introduces no new edge angle: the transformed clip is still a
   valid Manhattan-geometry layout. An arbitrary-angle rotation would
   not have this property (it would introduce diagonal edges that
   violate the Manhattan-grid assumption the benchmark's own patterns
@@ -456,8 +484,8 @@ Three arguments support this choice:
   this exact task.
   \item \textbf{Caveat: real lithography is not perfectly isotropic.}
   We note this is a modeling simplification rather than an exact physical
-  law. Real scanners can introduce mild orientation-dependent effects
-  -- off-axis illumination, a fixed scanner slit orientation, source
+  law. Real scanners can introduce mild orientation-dependent effects:
+  off-axis illumination, a fixed scanner slit orientation, source
   polarization, and conventional assist-feature placement rules are
   not perfectly rotation-invariant in practice. Our ratio-ablation
   results (Section~\ref{sec:ablation-results}) showing that
@@ -524,9 +552,9 @@ benchmark using the single checkpoint selected on the validation split
 \end{align}
 PR-AUC (average precision) is the area under the precision-recall
 curve traced out by sweeping the decision threshold over the model's
-predicted probabilities, rather than fixing it at 0.5. Unlike balanced
-accuracy, precision, recall, and F1 -- all of which are computed at a
-single, fixed threshold -- PR-AUC summarizes ranking quality across
+predicted probabilities, rather than fixing it at 0.5. Balanced
+accuracy, precision, recall, and F1 are all computed at a single,
+fixed threshold; PR-AUC instead summarizes ranking quality across
 \emph{every} threshold, and, per
 Section~\ref{sec:evalrelatedwork}, is the appropriate threshold-free
 companion metric on a positive class this rare
@@ -565,109 +593,123 @@ summary respectively.
 \begin{figure}[H]
 \centering
 \includegraphics[width=\linewidth]{../results/figures/average_summary.png}
-\caption{Average performance across all five benchmarks, per strategy.}
+\caption{Average performance across all five benchmarks and 3 seeds, per strategy (error bars = 1 std).}
 \label{fig:avg}
 \end{figure}
 
-Averaged over all five benchmarks, \textbf{Balanced Mini-Batch
-Sampling achieves the highest balanced accuracy (0.945) and the
-highest recall (0.980)}, followed by the Combined strategy (0.926),
-plain Random Oversampling (0.923), Oversampling+Augmentation (0.887),
-the natural-imbalance Baseline (0.844), and finally Random
-Undersampling, which is the \emph{worst}-performing strategy on
-average (0.779) despite actively targeting the class imbalance. Every
-active balancing strategy except RUS improves average balanced
-accuracy over the do-nothing baseline, confirming that data-level
-intervention helps overall -- but the size of that improvement, and
-even its sign, depends heavily on \emph{how} the distribution is
-altered and on the benchmark's specific imbalance severity.
+\textbf{Headline result: under a fair, equalised-update protocol with
+validation-based checkpoint selection, every strategy performs
+similarly well on balanced accuracy, and the large DA2 gaps mostly
+disappear.} Table~\ref{tab:main} and Table~\ref{tab:avgmetrics} show
+all eight strategies clustering tightly between 0.917 (ROS+Aug) and
+0.937 (Balanced Mini-Batch Sampling) average balanced accuracy, a
+spread of only 2 percentage points compared to the 17-point spread
+(0.779 to 0.945) we reported in DA2 under the unequal-update protocol.
+Table~\ref{tab:sig} confirms this statistically: \emph{none} of the
+seven balanced-accuracy comparisons we tested (including Balanced
+Mini-Batch vs.\ the do-nothing Baseline, and Balanced Mini-Batch vs.\
+RUS) reach significance at $\alpha=0.05$ under either the paired
+$t$-test or the Wilcoxon signed-rank test across the 15 paired
+(benchmark, seed) observations. We take this as the central finding of
+the revision: most of the dramatic strategy differences we reported in
+DA2 were a methodological artifact of unequal gradient updates and the
+absence of a validation split, not a real property of the balancing
+strategies themselves. Reviewers were right to flag this, and fixing
+it is the single biggest change in this paper.
 
-\textbf{The baseline is not uniformly bad -- it is unstable.} The
-natural-imbalance baseline is not a simple ``always predicts
-non-hotspot'' failure mode: on B1 (the mildest imbalance, 20.7:1) it
-reaches recall 1.000 but specificity only 0.626 (it over-predicts
-hotspot), while on B2 (82.9:1) it swings to the opposite failure mode,
-recall 0.396 with specificity 0.9999 (it under-predicts hotspot,
-missing 301 of 498 real hotspots). This confirms the assignment
-brief's premise directly: with severe imbalance, the \emph{direction} of a
-plain classifier's bias is not predictable from raw accuracy alone,
-which is precisely why balanced accuracy and the full confusion matrix
---- not accuracy --- must be the primary evaluation lens.
+\textbf{PR-AUC, however, reveals real, statistically significant
+differences that balanced accuracy at a fixed threshold completely
+hides.} Figure~\ref{fig:prauc} and the right-most column of
+Table~\ref{tab:avgmetrics} show PR-AUC varying far more widely across
+strategies (0.492 for RUS up to 0.750 for ROS) than balanced accuracy
+does, and Table~\ref{tab:sig} confirms several of these differences
+\emph{are} significant: ROS significantly outperforms RUS
+($p=0.0048$), Balanced-Batch significantly outperforms RUS
+($p=0.019$), and ROS significantly outperforms both the Baseline
+($p=0.033$) and ROS+Aug ($p=0.0025$) on this metric. In other words,
+once we stopped relying on a single 0.5-threshold summary and looked
+at ranking quality across all thresholds, RUS is revealed to be
+reliably, significantly worse than oversampling-based strategies,
+just not in the metric (balanced accuracy) we previously used to make
+that claim. This is exactly the justification for adding PR-AUC that
+Section~\ref{sec:evalrelatedwork} describes, and Section~\ref{sec:mechanism}
+explains the mechanism behind it.
 
-\textbf{Undersampling alone is unreliable at extreme imbalance.} RUS
-performs competitively on the milder benchmarks (B2: 0.947, B3: 0.949)
-but collapses on B5, the most extreme case (471:1 test imbalance, only
-26 native hotspot training images): balanced accuracy 0.500, recall
-0.000 -- the model predicts \emph{every single test image as
-non-hotspot}, even though the undersampled training set was
-artificially rebalanced to a 1:1 HS:NHS ratio. The ratio ablation
-(Section~\ref{sec:ablation-results}) shows this is not a tuning
-artifact: RUS stays stuck at recall 0.000 across \emph{every} tested
-target ratio on B5. The bottleneck is not the class \emph{proportion}
-in training but the absolute \emph{amount} of minority-class
-information available -- discarding majority-class data cannot
-manufacture hotspot signal that was never there, and with only 26
-originals the resulting $\sim$50-image training set is too small for
-an (admittedly tiny) CNN to learn a useful decision boundary in 8
-epochs.
+\begin{figure}[H]
+\centering
+\includegraphics[width=\linewidth]{../results/figures/pr_auc_grouped.png}
+\caption{PR-AUC by strategy across all five benchmarks (mean $\pm$ std over 3 seeds). Unlike balanced accuracy, PR-AUC spreads strategies out and several differences are statistically significant (Table~\ref{tab:sig}).}
+\label{fig:prauc}
+\end{figure}
 
-\textbf{Augmentation helps moderate imbalance but can hurt extreme
-imbalance.} Oversampling with augmentation (ROS+Aug) outperforms plain
-duplication (ROS) on B2 (0.992 vs.\ 0.978) and B3 (0.967 vs.\ 0.954),
-where the minority class still has a few hundred distinct originals to
-draw from. But on B5, where only 26 original hotspot images exist,
-ROS+Aug is dramatically \emph{worse} than plain ROS (0.707 vs.\
-0.914) -- worse even than doing nothing. When almost every
-hotspot example the network sees during training is a flipped or
-rotated synthetic variant of one of a handful of originals, the model
-appears to latch onto artifacts of the augmentation itself rather than
-genuine hotspot geometry, and generalizes poorly to the untouched,
-unaugmented test set. This is a genuinely useful negative result: it
-shows that augmentation is not an unconditionally safe default for
-minority classes and should be validated per-benchmark rather than
-applied uniformly.
+\subsection{Mechanistic Analysis: Why Did RUS Appear to Fail in DA2?}
+\label{sec:mechanism}
+DA2 reported RUS collapsing to 0\% recall on Benchmark 5 (balanced
+accuracy 0.500) under every tested class ratio, and we offered a
+mechanistic story about insufficient minority information. That story
+is now superseded: under the corrected protocol, RUS reaches 0.957
+balanced accuracy on B5 (Table~\ref{tab:main}), fully competitive with
+every other strategy. Figure~\ref{fig:learningcurve} shows why,
+using the per-step learning curves (Section~\ref{sec:methodology-steps})
+for Baseline, RUS, and Balanced-Batch on B5 across all 3 seeds.
 
-\textbf{Balanced-batch sampling is the most consistently strong
-strategy.} Unlike RUS/ROS/ROS+Aug, balanced mini-batch sampling never
-physically discards majority data nor duplicates/augments minority
-data on disk -- it only reweights which examples are drawn into each
-training batch. This turns out to be the most robust strategy across
-the full imbalance spectrum studied here, including the pathological
-B5 case (0.986 balanced accuracy, recall 0.976 -- the best result of
-\emph{any} strategy on B5). We interpret this as evidence that
-preserving full majority-class diversity while only adjusting
-\emph{sampling frequency} (rather than the underlying data pool)
-avoids both RUS's information loss and ROS/ROS+Aug's overfitting-to-
-duplicates risk.
+\begin{figure}[H]
+\centering
+\includegraphics[width=\linewidth]{../results/figures/learning_curves_b5.png}
+\caption{Training loss (left) and validation recall (right) vs.\ training step on Benchmark 5, for Baseline, RUS, and Balanced-Batch, across 3 seeds (thin lines) with the mean overlaid (thick line).}
+\label{fig:learningcurve}
+\end{figure}
 
-\textbf{The Combined strategy trades recall for precision.} The
-Combined strategy (moderate undersampling + augmented oversampling)
-is the second-best strategy on average balanced accuracy (0.926), but
-its confusion matrices (Fig.~\ref{fig:cmgrid}, bottom row) show a
-distinct profile: on B3 it achieves the best F1-score and precision of
-\emph{any} strategy (F1 = 0.793, precision = 0.772) at the cost of
-lower recall (0.816 vs.\ 0.987 for plain ROS). This makes Combined the
-most \emph{precision-oriented} of the strategies studied -- useful in
-a deployment where false hotspot flags carry a real downstream
-verification cost, as opposed to Balanced Mini-Batch Sampling, which
-is the most \emph{recall-oriented} choice when missing a true hotspot
-is the costlier error.
+Two mechanisms are visible. \textbf{First, RUS's training loss
+collapses almost to zero within the first $\sim$150 of 584 total
+steps,} because its resampled training pool on B5 has only $\sim$44
+images (22 HS + 22 NHS after the validation carve-out). The model
+memorizes it almost immediately, and every further step just sharpens
+the decision boundary around those exact 44 points rather than
+learning additional generalizable structure. \textbf{Second, RUS's
+validation recall reaches 1.0 within the first checkpoint (step
+$\approx$73) and stays there,} while the Baseline needs the
+\emph{entire} 584-step budget just to start detecting hotspots at all:
+its validation recall is stuck near 0 until step $\approx$220, because
+the natural class imbalance dilutes the gradient signal from the rare
+positive class. In DA2's fixed 8-epoch protocol with no checkpoint
+selection, RUS was evaluated at whatever point training happened to
+stop. Because RUS trains so much faster per step (fewer, smaller
+batches cycle through quickly), 8 naive epochs corresponded to
+\emph{far fewer total gradient updates} for RUS than for the other
+strategies, landing its evaluation at an early, poorly-converged point
+rather than at its true peak. The corrected protocol, equal steps for
+every strategy plus checkpoint selection on validation, simply finds
+and uses that peak instead.
+
+So the mechanistic answer to ``why does undersampling fail'' changes:
+\textbf{it does not fail under a fair training protocol.} Its apparent
+DA2 failure was the training protocol's fault, not the strategy's.
+What \emph{does} remain true, and is visible in the PR-AUC results
+above, is that RUS's tiny effective
+training set makes its probability outputs fragile and poorly ranked
+across thresholds (PR-AUC 0.492, the lowest of any strategy, and
+significantly below ROS, Balanced-Batch, and Combo-Batch-Aug): the
+checkpoint selected on validation happens to sit at a good
+\emph{operating point} (0.5 threshold) for balanced accuracy, but the
+model has not learned a reliable confidence signal \emph{around} that
+point, because so few distinct minority examples were ever available
+to calibrate it against. This is the correct, narrower, and more
+defensible mechanistic claim: undersampling's real cost is reduced
+calibration/ranking quality from training-set impoverishment, not
+outright inability to detect hotspots.
 
 \subsection{Confusion Matrix Analysis}
-Figure~\ref{fig:cmgrid} shows the raw confusion matrix (with
-row-normalized shading) for every (strategy, benchmark) pair. The
-baseline row (top) visibly swings between over-predicting hotspot on
-B1 (bright off-diagonal FP cell) and under-predicting it on B2 (bright
-off-diagonal FN cell), illustrating the instability discussed above.
-From RUS downward, the FN column (missed hotspots, top-right cell of
-each panel) shrinks markedly for every benchmark except B5's RUS
-panel, which is the one cell in the entire grid where the model
-predicts the non-hotspot class 100\% of the time regardless of ground
-truth -- a visually obvious confirmation of the recall collapse
-reported numerically above. The Balanced Mini-Batch and Combined rows
-have the most consistently dark diagonal (correct-prediction) cells
-across every column, visually corroborating their higher average
-balanced accuracy.
+Figure~\ref{fig:cmgrid} shows the confusion matrix, summed over all 3
+seeds (so each cell reflects 3$\times$ the per-seed test-set size), for
+every (strategy, benchmark) pair. Every strategy's diagonal (correct
+predictions) is visually dominant across every benchmark, consistent
+with the tightly-clustered balanced accuracies in
+Table~\ref{tab:main}; the RUS row still shows visibly more FP mass
+(a wider, lighter off-diagonal FP cell) than ROS or Balanced-Batch on
+several benchmarks, which is the confusion-matrix-level signature of
+the lower precision/F1/PR-AUC numbers discussed above even though its
+recall and balanced accuracy are competitive.
 
 \begin{figure}[H]
 \centering
@@ -697,45 +739,43 @@ rebalancing) to 1.0 (fully balanced), for all five benchmarks.
 \label{fig:ablcombo}
 \end{figure}
 
-Two findings stand out. First, \textbf{on B5, RUS's recall stays at
-exactly 0.000 across every tested ratio} (Fig.~\ref{fig:ablrus}),
-confirming that the failure identified in Section~\ref{sec:results} is
-not a single unlucky hyperparameter choice: undersampling cannot
-rescue detection when the minority class has too few original
-examples to begin with, regardless of how aggressively the majority
-class is discarded. On benchmarks with a larger native minority pool
-(B2, B3), by contrast, RUS's recall and specificity both respond
-smoothly to the ratio, and a more moderate ratio (0.10--0.25, i.e.\
-less aggressive undersampling) often \emph{outperforms} the fully
-balanced 1.0 setting -- e.g.\ B2 balanced accuracy peaks at 0.985 at
-ratio 0.10 versus 0.947 at ratio 1.0 -- because discarding less
-majority data at a gentler ratio retains more of the decision
-boundary information the model needs.
+Consistent with the corrected main-grid findings
+(Section~\ref{sec:results}), \textbf{RUS's recall and specificity are
+now stable and high across every tested ratio on every benchmark,
+including B5} (Fig.~\ref{fig:ablrus}): recall never drops below 0.90
+and specificity never below 0.95 on B5, a complete reversal of the
+DA2 ablation, which reported RUS recall stuck at exactly 0.000
+regardless of ratio. This confirms, under a second and independent
+experimental setting, that the DA2 collapse was a training-protocol
+artifact rather than a property of the ratio itself.
 
-Second, \textbf{the ratio-accuracy relationship for the
-augmentation-based strategies is not monotonic and is sometimes
-unstable on the smallest benchmarks.} For example, the Combined
-strategy on B4 achieves balanced accuracy 0.960 at ratio 0.25 but
-collapses to 0.562 at ratio 0.50 before recovering to 0.966 at ratio
-1.0 (Fig.~\ref{fig:ablcombo}); ROS+Aug shows a similar dip-then-recover
-pattern on B5. Because every ratio was trained from a single fixed
-seed, we cannot fully separate a genuine ratio effect from
-run-to-run optimization variance on these very small training sets
-(B4/B5 have well under 100 native hotspot images) -- this is a
-limitation we return to in Section~\ref{sec:limitations}. The
-practical implication for a practitioner, however, is the same either
-way: on critically small benchmarks, the choice of resampling ratio
-should be validated empirically (ideally averaged over multiple
-seeds) rather than assumed to improve monotonically with how
-``balanced'' the training set is made.
+The ratio sweep does, however, surface a mechanistically informative
+pattern that balanced accuracy alone would miss: \textbf{on B5,
+RUS's PR-AUC degrades sharply as the undersampling ratio becomes more
+aggressive} (i.e.\ as the resampled training pool shrinks further),
+falling from 0.799 at the mildest ratio (0.10) to just 0.078--0.11 at
+ratios 0.25 through 1.0, even though balanced accuracy stays flat and
+high (0.936--0.974) throughout. This is the ablation-level confirmation
+of the mechanism described in Section~\ref{sec:mechanism}: the
+checkpoint-selection process can still find a good operating threshold
+even from a severely shrunken training pool, but the smaller that pool
+gets, the less reliable the model's probability ranking becomes
+\emph{around} that threshold. For the Combined strategy
+(Fig.~\ref{fig:ablcombo}), balanced accuracy is likewise fairly flat
+across ratios on every benchmark (no DA2-style collapse-and-recover
+pattern at any ratio on B4), though individual benchmarks still show
+single-seed noise of a few percentage points between adjacent ratios
+(e.g.\ B4 combo dips to 0.896 at ratio 0.10) that
+Section~\ref{sec:limitations} discusses as a remaining limitation of
+the single-seed ablation design.
 
 \section{Comparison with Published ICCAD-12 Results}
 \label{sec:published}
 DA2 feedback (common to all groups) asked us to compare against
 published ICCAD-12 results rather than only our own baseline. This is
 a harder comparison than it may first appear: published hotspot
-detectors differ in preprocessing, train/test protocol, and -- most
-importantly -- almost all of them report only an \emph{aggregate}
+detectors differ in preprocessing and train/test protocol, and, most
+importantly, almost all of them report only an \emph{aggregate}
 number across all five benchmarks rather than a per-benchmark
 breakdown, whereas our own primary results are deliberately kept
 per-benchmark (Section~\ref{sec:dataset}). Table~\ref{tab:published}
@@ -756,12 +796,27 @@ paper's own self-reported aggregate; see text for caveats.}
 \toprule
 Method & Recall & Precision & F1 \\
 \midrule
-This work (Bal.\ Batch, aggregate) & see Table~\ref{tab:avgmetrics} & -- & -- \\
+This work (Bal.\ Batch, aggregate) & 0.971 & 0.301 & 0.431 \\
+This work (ROS, aggregate) & 0.967 & 0.340 & 0.474 \\
 Huang et al.\ \cite{huang2021enhancements} & $>$0.988 (B1--B4) & -- & -- \\
 Lin et al.\ (YOLOv5) \cite{lin2025yolov5} & $\approx$1.000 & 0.828 & 0.906 \\
 \bottomrule
 \end{tabular}
 \end{table}
+
+Our recall (0.967--0.971) is in the same broad range as, though
+somewhat below, the near-100\% figures reported by
+\cite{huang2021enhancements} and \cite{lin2025yolov5}; our precision
+and F1, however, are substantially lower. We believe this gap is
+explained largely by our deliberately reduced input resolution
+($64{\times}64{\times}1$ vs.\ full-resolution inputs in both
+comparison papers; see Section~\ref{sec:limitations}) and our much
+smaller backbone (8{,}649 parameters), both chosen to make the full
+multi-strategy, multi-seed experiment grid tractable on CPU-only
+hardware rather than to maximize absolute precision. We report this
+gap honestly rather than omit the comparison: it is a genuine
+limitation of this study's compute budget, not evidence that our
+balancing strategies are ineffective relative to the literature.
 
 \cite{huang2021enhancements} reports recall above 98.8\% on four of
 the five ICCAD-12 benchmarks (100\% on B1 and B3 specifically) using a
@@ -771,13 +826,13 @@ reports an aggregate recall near 100\% with precision 0.828 and
 F1-score 0.906 across the ICCAD-12 set. Both achieve very high recall,
 consistent with the general pattern in this literature (and in our own
 results) that pushing recall toward 100\% is comparatively easy under
-severe imbalance -- the harder, more diagnostic number is what happens
+severe imbalance. The harder, more diagnostic number is what happens
 to precision/false alarms at that recall level, which is exactly why
 this paper reports the full confusion matrix and PR-AUC rather than
 recall alone. \cite{wang2021gan} reports (in relative rather than
 absolute terms) up to 3\% accuracy improvement and up to 5\% false-alarm
 reduction from GAN-based augmentation over conventional augmentation
-at matched conditions -- directionally consistent with our own finding
+at matched conditions, directionally consistent with our own finding
 that \emph{some} form of augmentation beats the naive baseline, though
 not directly comparable in magnitude since the baseline and
 architecture both differ from ours. We were not able to extract a
@@ -788,48 +843,64 @@ than fabricate a number, and flag it as an item for future work
 (Section~\ref{sec:limitations}).
 
 \section{Discussion}
-Bringing the main comparison and the ablation together, three
-practical conclusions answer our research question directly.
+Bringing the main comparison, the significance tests, and the
+mechanistic analysis together, three practical conclusions answer our
+research question, and, just as importantly, revise our own DA2
+conclusions.
 
-\textbf{(1) Some form of data-level balancing is worth doing, but
-naive undersampling is the wrong default.} Every strategy that adds
-information (oversampling, augmentation, balanced-batch sampling, or
-their combination) beats or matches the natural-imbalance baseline on
-average, while the one strategy that only removes information (RUS)
-is the single worst performer overall and the only strategy that
-fails catastrophically (0\% recall) on the most extreme benchmark. For
-lithography hotspot detection specifically, where the whole point is
-to catch rare hotspot geometries, throwing away majority data is a
-weak trade against the risk of losing scarce and already-limited
-minority signal indirectly (via a poorly-conditioned, data-starved
-training run).
+\textbf{(1) Once training is made fair, the choice of balancing
+strategy matters far less for balanced accuracy than DA2 suggested,
+but it still matters for ranking quality.} With equalised gradient
+updates and validation-based checkpoint selection, no strategy's
+balanced accuracy is statistically distinguishable from any other's
+(Table~\ref{tab:sig}), including the do-nothing Baseline. This is not
+a null result we are downplaying: it is the paper's central finding,
+and it directly contradicts our own DA2 claim that balancing strategy
+choice was the dominant factor. What \emph{does} separate the
+strategies is PR-AUC, where ROS, Balanced-Batch, and Combo-Batch-Aug
+are all significantly better than RUS, and ROS is additionally
+significantly better than both the Baseline and ROS+Aug. The practical
+upshot: if a practitioner only checks balanced accuracy at a fixed
+threshold, nearly any strategy will look adequate; if they care about
+the full operating range of the detector (as a real screening pipeline
+feeding a verification queue would), oversampling-based strategies
+(plain ROS in particular) provide a measurably more reliable ranking.
 
-\textbf{(2) Balanced mini-batch sampling is the strongest
-general-purpose choice in this study, precisely because it changes
-\emph{how data is drawn}, not \emph{what data exists}.} It matched or
-beat every other strategy's balanced accuracy on 3 of 5 benchmarks and
-was the only strategy that remained reliable on the most extreme
-benchmark (B5). Because it requires no offline duplication and no
-augmentation pipeline, it is also the simplest strategy to deploy.
+\textbf{(2) RUS's DA2 "failure" was a protocol artifact, and correcting
+it changes the paper's conclusion, not just its numbers.} Section~\ref{sec:mechanism}
+shows RUS reaches 0.957 balanced accuracy on the same benchmark (B5)
+where DA2 reported 0.500 and 0\% recall, once gradient updates are
+equalised and the checkpoint is selected on held-out validation data
+rather than read off at an arbitrary, unequal-update stopping point.
+We are revising our own prior claim here rather than defending it,
+because the reviewer feedback that prompted this revision was correct:
+undersampling is not mechanistically broken for this task; it is
+simply more sensitive to \emph{how long and how carefully} it is
+trained, because its resampled training pool is so much smaller.
 
-\textbf{(3) Augmentation is a conditional benefit, not an
-unconditional one.} It helped substantially on benchmarks with a
-moderate minority pool (B2, B3) but actively hurt on the benchmark
-with the fewest original hotspot examples (B5), where plain
-duplication outperformed it. This is the clearest actionable finding
-for the assignment's ``effect of the altered class distribution''
-requirement: the right strategy is benchmark-dependent, and a single
-data-balancing recipe applied uniformly across all five ICCAD-12
-benchmarks is measurably suboptimal compared to picking (or at least
-validating) the strategy per benchmark.
+\textbf{(3) Augmentation's physical justification
+(Section~\ref{sec:physical-aug}) does not guarantee a uniform
+empirical benefit, and this is itself informative.} ROS+Aug has the
+\emph{lowest} average balanced accuracy of all eight strategies
+(0.917) and does not significantly beat plain ROS on PR-AUC in the
+direction we expected. If anything, ROS significantly
+\emph{outperforms} ROS+Aug on PR-AUC ($p=0.0025$, Table~\ref{tab:sig}).
+Flip/rotation augmentation is physically valid (Section~\ref{sec:physical-aug}),
+but validity of a transform does not automatically translate into a
+training benefit at this model scale and step budget; on several
+benchmarks, plain duplication gives the optimizer a simpler, lower-
+variance target than the synthetically diversified one. This is a
+genuinely useful negative result for the broader literature on
+augmentation for scarce, highly structured visual data.
 
 \section{Limitations and Future Work}
 \label{sec:limitations}
 \textbf{Reduced input resolution.} To make the full five-benchmark
-$\times$ six-strategy grid, plus the class-ratio ablation ($3
-\times 5 \times 5 = 75$ additional runs), tractable on CPU-only
-hardware, we downsampled input images from the reference's
-$224{\times}224{\times}3$ to $64{\times}64{\times}1$. This likely
+$\times$ eight-strategy $\times$ 3-seed grid (120 runs), plus the
+class-ratio ablation ($3 \times 5 \times 5 = 75$ further runs) and the
+learning-curve diagnostics, tractable on CPU-only hardware, we
+downsampled input images from the reference's $224{\times}224{\times}3$
+to $64{\times}64{\times}1$. This likely
 discards fine-grained geometric detail that a full-resolution model
 could exploit; balanced-accuracy values reported here should therefore
 be read as relative comparisons \emph{between strategies under
@@ -874,8 +945,8 @@ as a pure function of the raw imbalanced training arrays
 (\texttt{src/balancing.py}); the training/evaluation loop
 (\texttt{src/train.py}) and the experiment grid
 (\texttt{src/run\_experiments.py}) are fully deterministic given a
-seed. The main comparison is run under three fixed seeds --
-$42$, $123$, and $2024$ -- for every (benchmark, strategy) condition
+seed. The main comparison is run under three fixed seeds
+($42$, $123$, and $2024$) for every (benchmark, strategy) condition
 (\texttt{src/run\_experiments.py::SEEDS}); the class-ratio ablation
 uses seed $42$ only (Section~\ref{sec:limitations}). The validation
 split itself uses a separate, fixed split seed
@@ -929,27 +1000,35 @@ Author & Primary Contributions \\
 \section{Conclusion}
 We set out to answer a specific question: which data-balancing
 strategy is most effective for the severely imbalanced ICCAD-12
-lithography hotspot detection task? Under a controlled comparison that
-holds the classification backbone fixed across five benchmarks and six
-training-data strategies, the answer is nuanced but actionable.
-Balanced mini-batch sampling delivered the best average balanced
-accuracy (0.945) and the best worst-case behavior (remaining reliable
-even on the 471:1-imbalanced Benchmark 5), making it the strongest
-general-purpose recommendation from this study. Plain random
-undersampling, despite directly targeting the imbalance, was the
-weakest strategy overall and failed completely on the most extreme
-benchmark, showing that discarding majority data cannot compensate for
-a minority class that is simply too small to begin with. Augmentation-
-based oversampling was a clear net positive on moderately imbalanced
-benchmarks but a clear net negative on the most extreme one -- direct,
-quantitative evidence that the effectiveness of a balancing strategy
-is not a fixed property of the technique but depends on the severity
-of imbalance and the absolute size of the minority class it is applied
-to. Practitioners building a hotspot detector on a new, similarly
-imbalanced benchmark should therefore treat the balancing strategy
-itself as a tunable, benchmark-specific design choice, evaluated with
-balanced accuracy and the full confusion matrix rather than assumed
-from a single default recipe.
+lithography hotspot detection task? Our DA2 submission answered this
+with a large, clean-looking spread between strategies, and DA2
+reviewer feedback correctly identified that this spread was likely
+contaminated by an unfair training protocol (unequal gradient updates,
+no validation split, a single seed). This revision fixes exactly those
+three issues, and the answer changes substantially as a result. Under
+equalised gradient-update steps, validation-based checkpoint selection,
+and a 3-seed protocol with paired significance testing, \textbf{no
+strategy's balanced accuracy is statistically distinguishable from any
+other's}, including the natural-imbalance baseline. That is a
+materially different, more cautious conclusion than DA2's. PR-AUC, which we added
+specifically in response to feedback, recovers real and statistically
+significant structure that balanced accuracy at a fixed threshold
+hides: oversampling-based strategies (plain ROS in particular)
+significantly outperform random undersampling on ranking quality, even
+though their balanced accuracies are statistically tied. The
+undersampling strategy that appeared to collapse entirely in DA2 does
+not actually fail mechanistically; it was being evaluated unfairly,
+and once corrected it performs competitively on balanced accuracy
+while remaining measurably worse on PR-AUC, a more precise and
+defensible characterization of its real weakness. Practitioners
+building a hotspot detector on a new, similarly imbalanced benchmark
+should therefore (1) not expect balancing-strategy choice alone to be
+a large lever once training is done fairly, (2) evaluate with a
+threshold-free ranking metric such as PR-AUC in addition to balanced
+accuracy, since that is where real differences between strategies
+actually show up, and (3) treat any single-seed, unequal-update
+comparison, including our own DA2 submission, with appropriate
+skepticism.
 
 \begin{thebibliography}{00}
 \bibitem{torres2012iccad} J. A. Torres, ``ICCAD-2012 CAD contest in fuzzy pattern matching for physical verification and benchmark suite,'' in \emph{Proc. IEEE/ACM Int. Conf. Computer-Aided Design (ICCAD)}, 2012, pp. 349--350.

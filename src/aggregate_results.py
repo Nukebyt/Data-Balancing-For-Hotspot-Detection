@@ -88,7 +88,7 @@ if __name__ == "__main__":
     overall.to_csv(os.path.join(TABLES_DIR, "main_results_agg_overall.csv"))
     print(overall[[c for c in overall.columns if c.endswith("_mean")]])
 
-    comparisons = [
+    ba_comparisons = [
         ("balanced_batch", "none"),
         ("balanced_batch", "rus"),
         ("balanced_batch", "combo"),
@@ -97,7 +97,18 @@ if __name__ == "__main__":
         ("combo", "none"),
         ("rus", "none"),
     ]
-    tests = [paired_test(df, a, b) for a, b in comparisons]
+    prauc_comparisons = [
+        ("ros", "rus"),
+        ("balanced_batch", "rus"),
+        ("ros", "none"),
+        ("ros", "ros_aug"),
+        ("balanced_batch", "none"),
+        ("combo_batch_aug", "rus"),
+    ]
+    tests = (
+        [paired_test(df, a, b, metric="balanced_accuracy") for a, b in ba_comparisons]
+        + [paired_test(df, a, b, metric="pr_auc") for a, b in prauc_comparisons]
+    )
     with open(os.path.join(TABLES_DIR, "significance_tests.json"), "w") as f:
         json.dump(tests, f, indent=2)
     for t in tests:

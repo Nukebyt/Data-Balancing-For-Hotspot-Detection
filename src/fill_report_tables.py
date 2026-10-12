@@ -163,22 +163,24 @@ def build_significance_table():
         return "% significance_tests.json not found -- run src/aggregate_results.py first"
     with open(path) as f:
         tests = json.load(f)
+    metric_label = {"balanced_accuracy": "BalAcc", "pr_auc": "PR-AUC"}
     lines = []
-    lines.append(r"\begin{table}[H]")
+    lines.append(r"\begin{table}[t]")
     lines.append(r"\centering")
-    lines.append(r"\small")
-    lines.append(r"\caption{Paired significance tests on balanced accuracy (15 paired observations: 5 benchmarks $\times$ 3 seeds). A difference is called significant only when both tests agree at $\alpha=0.05$.}")
+    lines.append(r"\footnotesize")
+    lines.append(r"\caption{Paired significance tests (15 paired observations: 5 benchmarks $\times$ 3 seeds each). A difference is called significant only when both the paired $t$-test and the Wilcoxon signed-rank test agree at $\alpha=0.05$.}")
     lines.append(r"\label{tab:sig}")
-    lines.append(r"\begin{tabular}{llcccc}")
+    lines.append(r"\begin{tabular}{llccccc}")
     lines.append(r"\toprule")
-    lines.append(r"A & B & Mean A & Mean B & $p$ (t-test) & Sig.? \\")
+    lines.append(r"Metric & A & B & Mean A & Mean B & $p$ (t-test) & Sig.? \\")
     lines.append(r"\midrule")
     for t in tests:
         a_lab = STRAT_LATEX.get(t["strategy_a"], t["strategy_a"])
         b_lab = STRAT_LATEX.get(t["strategy_b"], t["strategy_b"])
+        m_lab = metric_label.get(t["metric"], t["metric"])
         sig = r"\textbf{Yes}" if t["significant_both_alpha05"] else "No"
         lines.append(
-            f"{a_lab} & {b_lab} & {t['mean_a']:.3f} & {t['mean_b']:.3f} & {t['ttest_p']:.3g} & {sig}" + r" \\"
+            f"{m_lab} & {a_lab} & {b_lab} & {t['mean_a']:.3f} & {t['mean_b']:.3f} & {t['ttest_p']:.3g} & {sig}" + r" \\"
         )
     lines.append(r"\bottomrule")
     lines.append(r"\end{tabular}")

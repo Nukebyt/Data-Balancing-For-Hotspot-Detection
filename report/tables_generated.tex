@@ -2,18 +2,21 @@
 
 \begin{table}[H]
 \centering
-\caption{Balanced Accuracy per strategy on every ICCAD-12 benchmark, plus the 5-benchmark average. Highest per column is \textbf{bolded}.}
+\small
+\caption{Balanced Accuracy (mean $\pm$ std over 3 seeds) per strategy on every ICCAD-12 benchmark, plus the overall average (5 benchmarks $\times$ 3 seeds = 15 runs). Highest mean per column is \textbf{bolded}.}
 \label{tab:main}
 \begin{tabular}{lcccccc}
 \toprule
 Strategy & B1 & B2 & B3 & B4 & B5 & \textbf{Avg} \\
 \midrule
-Baseline (None) & 0.813 & 0.698 & 0.949 & 0.845 & 0.914 & 0.844 \\
-RUS & 0.808 & 0.947 & 0.949 & 0.688 & 0.500 & 0.779 \\
-ROS & 0.806 & 0.978 & 0.954 & 0.964 & 0.914 & 0.923 \\
-ROS+Aug & 0.808 & 0.992 & 0.967 & 0.961 & 0.707 & 0.887 \\
-Bal.\ Batch & \textbf{0.815} & 0.981 & \textbf{0.972} & \textbf{0.970} & \textbf{0.986} & \textbf{0.945} \\
-Combined & 0.806 & \textbf{0.992} & 0.903 & 0.966 & 0.961 & 0.926 \\
+Baseline & \textbf{0.811} & 0.986 & 0.963 & 0.929 & 0.923 & 0.922 \\
+RUS & 0.810 & 0.978 & 0.958 & 0.937 & 0.957 & 0.928 \\
+ROS & 0.808 & 0.984 & 0.957 & \textbf{0.962} & 0.969 & 0.936 \\
+ROS+Aug & 0.804 & 0.975 & \textbf{0.968} & 0.938 & 0.901 & 0.917 \\
+Bal.\ Batch & 0.808 & \textbf{0.990} & 0.958 & 0.958 & 0.971 & \textbf{0.937} \\
+Combo(50\%) & 0.806 & 0.930 & 0.957 & 0.949 & \textbf{0.975} & 0.924 \\
+Combo(25\%) & 0.806 & 0.973 & 0.959 & 0.961 & 0.955 & 0.931 \\
+Combo(B+A) & 0.807 & 0.971 & 0.965 & 0.953 & 0.974 & 0.934 \\
 \bottomrule
 \end{tabular}
 \end{table}
@@ -22,18 +25,49 @@ Combined & 0.806 & \textbf{0.992} & 0.903 & 0.966 & 0.961 & 0.926 \\
 
 \begin{table}[H]
 \centering
-\caption{All metrics, averaged across the 5 ICCAD-12 benchmarks, per strategy. Highest value per column is \textbf{bolded}.}
+\small
+\caption{All metrics, mean $\pm$ std across all 5 benchmarks $\times$ 3 seeds (15 runs), per strategy. Highest mean per column is \textbf{bolded}.}
 \label{tab:avgmetrics}
-\begin{tabular}{lccccc}
+\begin{tabular}{lcccccc}
 \toprule
-Strategy & BalAcc & Recall & Spec. & F1 & Prec. \\
+Strategy & BalAcc & Recall & Spec. & F1 & Prec. & PR-AUC \\
 \midrule
-Baseline (None) & 0.844 & 0.781 & 0.906 & \textbf{0.503} & \textbf{0.502} \\
-RUS & 0.779 & 0.642 & \textbf{0.915} & 0.228 & 0.144 \\
-ROS & 0.923 & 0.949 & 0.897 & 0.456 & 0.326 \\
-ROS+Aug & 0.887 & 0.871 & 0.903 & 0.453 & 0.426 \\
-Bal.\ Batch & \textbf{0.945} & \textbf{0.980} & 0.909 & 0.446 & 0.309 \\
-Combined & 0.926 & 0.939 & 0.913 & 0.491 & 0.383 \\
+Baseline & 0.922 & 0.940 & 0.905 & 0.468 & 0.351 & 0.664 \\
+RUS & 0.928 & \textbf{0.974} & 0.883 & 0.308 & 0.206 & 0.492 \\
+ROS & 0.936 & 0.967 & 0.905 & 0.474 & 0.340 & \textbf{0.750} \\
+ROS+Aug & 0.917 & 0.926 & \textbf{0.908} & \textbf{0.497} & \textbf{0.368} & 0.663 \\
+Bal.\ Batch & \textbf{0.937} & 0.971 & 0.903 & 0.431 & 0.301 & 0.718 \\
+Combo(50\%) & 0.924 & 0.952 & 0.895 & 0.404 & 0.296 & 0.649 \\
+Combo(25\%) & 0.931 & 0.957 & 0.904 & 0.453 & 0.327 & 0.658 \\
+Combo(B+A) & 0.934 & 0.960 & 0.908 & 0.448 & 0.320 & 0.681 \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+
+
+\begin{table}[t]
+\centering
+\footnotesize
+\caption{Paired significance tests (15 paired observations: 5 benchmarks $\times$ 3 seeds each). A difference is called significant only when both the paired $t$-test and the Wilcoxon signed-rank test agree at $\alpha=0.05$.}
+\label{tab:sig}
+\begin{tabular}{llccccc}
+\toprule
+Metric & A & B & Mean A & Mean B & $p$ (t-test) & Sig.? \\
+\midrule
+BalAcc & Bal.\ Batch & Baseline & 0.937 & 0.922 & 0.097 & No \\
+BalAcc & Bal.\ Batch & RUS & 0.937 & 0.928 & 0.0439 & No \\
+BalAcc & Bal.\ Batch & Combo(50\%) & 0.937 & 0.924 & 0.139 & No \\
+BalAcc & Bal.\ Batch & Combo(25\%) & 0.937 & 0.931 & 0.11 & No \\
+BalAcc & Bal.\ Batch & Combo(B+A) & 0.937 & 0.934 & 0.553 & No \\
+BalAcc & Combo(50\%) & Baseline & 0.924 & 0.922 & 0.928 & No \\
+BalAcc & RUS & Baseline & 0.928 & 0.922 & 0.418 & No \\
+PR-AUC & ROS & RUS & 0.750 & 0.492 & 0.00478 & \textbf{Yes} \\
+PR-AUC & Bal.\ Batch & RUS & 0.718 & 0.492 & 0.0189 & \textbf{Yes} \\
+PR-AUC & ROS & Baseline & 0.750 & 0.664 & 0.0334 & \textbf{Yes} \\
+PR-AUC & ROS & ROS+Aug & 0.750 & 0.663 & 0.00248 & \textbf{Yes} \\
+PR-AUC & Bal.\ Batch & Baseline & 0.718 & 0.664 & 0.0258 & \textbf{Yes} \\
+PR-AUC & Combo(B+A) & RUS & 0.681 & 0.492 & 0.0265 & \textbf{Yes} \\
 \bottomrule
 \end{tabular}
 \end{table}
@@ -42,18 +76,21 @@ Combined & 0.926 & 0.939 & 0.913 & 0.491 & 0.383 \\
 
 \begin{table}[H]
 \centering
-\caption{Confusion matrix totals (TP/FP/FN/TN) per strategy, summed across all 5 benchmarks.}
+\small
+\caption{Confusion matrix totals (TP/FP/FN/TN) per strategy, summed across all 5 benchmarks and all 3 seeds.}
 \label{tab:cm}
 \begin{tabular}{lrrrr}
 \toprule
 Strategy & TP & FP & FN & TN \\
 \midrule
-Baseline (None) & 2365 & 6037 & 385 & 137490 \\
-RUS & 2520 & 9217 & 230 & 134310 \\
-ROS & 2706 & 7469 & 44 & 136058 \\
-ROS+Aug & 2676 & 5684 & 74 & 137843 \\
-Bal.\ Batch & 2686 & 5040 & 64 & 138487 \\
-Combined & 2403 & 3613 & 347 & 139914 \\
+Baseline & 7961 & 16300 & 289 & 414281 \\
+RUS & 8052 & 26616 & 198 & 403965 \\
+ROS & 8056 & 17047 & 194 & 413534 \\
+ROS+Aug & 7971 & 13984 & 279 & 416597 \\
+Bal.\ Batch & 8066 & 17739 & 184 & 412842 \\
+Combo(50\%) & 7899 & 21391 & 351 & 409190 \\
+Combo(25\%) & 8005 & 16526 & 245 & 414055 \\
+Combo(B+A) & 7961 & 14245 & 289 & 416336 \\
 \bottomrule
 \end{tabular}
 \end{table}
@@ -62,18 +99,21 @@ Combined & 2403 & 3613 & 347 & 139914 \\
 
 \begin{table}[H]
 \centering
-\caption{Average training set size, training time, and per-image inference time per strategy (averaged across the 5 benchmarks).}
+\small
+\caption{Average training set size, training time, and per-image inference time per strategy.}
 \label{tab:timing}
 \begin{tabular}{lrrr}
 \toprule
 Strategy & Train N & Train (s) & Infer (ms/img) \\
 \midrule
-Baseline (None) & 3748 & 51.7 & 0.662 \\
-RUS & 521 & 7.7 & 0.630 \\
-ROS & 6974 & 101.4 & 0.644 \\
-ROS+Aug & 6974 & 99.8 & 0.619 \\
-Bal.\ Batch & 3748 & 54.8 & 0.614 \\
-Combined & 3487 & 50.3 & 0.628 \\
+Baseline & 3186 & 6.7 & 0.069 \\
+RUS & 443 & 6.5 & 0.069 \\
+ROS & 5928 & 6.7 & 0.069 \\
+ROS+Aug & 5928 & 7.4 & 0.068 \\
+Bal.\ Batch & 3186 & 6.7 & 0.069 \\
+Combo(50\%) & 2964 & 7.4 & 0.069 \\
+Combo(25\%) & 4446 & 7.7 & 0.071 \\
+Combo(B+A) & 3186 & 7.3 & 0.070 \\
 \bottomrule
 \end{tabular}
 \end{table}

@@ -24,3 +24,6 @@ report/*.toc
 # OS cruft
 .DS_Store
 Thumbs.db
+
+# Stray local QA scratch (not part of the deliverables)
+/qa_final/
