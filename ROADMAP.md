@@ -1,13 +1,69 @@
-# Project Roadmap — Group 11 DA-2 (Data Balancing and Augmentation Strategies for Hotspot Detection)
+# Project Roadmap — Group 11 (Data Balancing and Augmentation Strategies for Hotspot Detection)
 
 This document is the "plain-language walkthrough" of the project: what the
 assignment actually asks for, what decisions we made and why, what has been
 built, what still needs to happen, and how everything maps back to the
-15-day timeline and the 30-mark rubric in `DA2_BVD_AIML_4.9.2026.pdf`. Read
-`README.md` for the terse repo/usage reference; read this file for the
-reasoning behind it.
+rubric. Read `README.md` for the terse repo/usage reference; read this file
+for the reasoning behind it. The DA2 section below is kept for history;
+see the DA3 section immediately after this intro for the current state.
+
+## DA3 status (current)
+
+DA3 is a revision of the DA2 submission, driven by the feedback document
+`DA2 Hotspot Detection_Feedback (G1–G19).pdf`. Every item listed for Group
+11, plus the "common to all groups" items, has been addressed; see
+`README.md` section 2 for the full point-by-point mapping. The single
+biggest change: DA2's training protocol (fixed epochs, no validation
+split, one seed) was confounding the balancing-strategy comparison, and
+correcting it overturns most of DA2's headline conclusions. The revised
+report explains this openly rather than hiding it.
+
+**What's done:**
+- Code: `src/data_split.py` (validation carve-out), `src/train.py`
+  (step-based training + checkpoint selection + learning curves),
+  `src/balancing.py` (8 strategies, up from 6), `src/metrics.py`
+  (PR-AUC), `src/run_experiments.py` (multi-seed grid),
+  `src/aggregate_results.py` (significance testing).
+- All 204 experiment runs completed (120 main + 75 ablation + 9
+  learning-curve), results and figures committed under `results/`.
+- `report/report.tex` rewritten section-by-section with the corrected
+  findings, literature review expanded to 40 references, and a full
+  dash/AI-tell cleanup pass on the prose.
+- `report/G11_DA3_SingleColumn.docx` and `report/G11_DA3_DoubleColumn.docx`
+  generated via `report/build_docx.py` (a pandoc-based pipeline — see
+  that file's docstring for the specific pandoc gaps it works around).
+- `report/slides.pptx` rebuilt: 17 slides, including a dedicated
+  "Feedback Addressed" slide and a GitHub-link placeholder slide.
+- Local git repository initialized and committed (two commits so far).
+
+**What's still on you (the group):**
+1. **GitHub repo.** No GitHub remote exists yet. Create a repository
+   (e.g. `Lithography-Hotspot-Detection-G11`), then from this folder:
+   `git remote add origin <your-repo-url>` and `git push -u origin
+   master` (or `main`, matching whatever branch name the new repo
+   uses). Afterward, replace every
+   `https://github.com/<your-github-username>/...` placeholder in
+   `report/slides.pptx` (slide 1 and the final slide) with the real
+   URL and re-run `node build_slides.js` in `report/`.
+2. **Plagiarism report and AI-content report.** These require
+   institutional tools (Turnitin via VIT's portal, and an AI-detector
+   such as GPTZero/Originality.ai) that aren't available here. Run the
+   finished `G11_DA3_SingleColumn.docx` or the PDF through both and
+   save their reports as separate files for the submission.
+3. **Final PDF naming.** The checklist asks for "a single PDF
+   file_named with group number" — rename/export the final report PDF
+   accordingly (e.g. `G11_DA3.pdf`) alongside the two Word documents,
+   which already carry the group-number naming convention.
+4. **Microsoft Forms submission** (`FS_26-27_DA_2_BVD_AIMLIC`) by
+   01/11/2026, 11:00 PM: the PDF, both Word docs, the PPT (with the
+   real GitHub link filled in), and the plagiarism/AI reports.
+5. **Presentation practice.** 7-minute time limit, both members must
+   actively participate and be prepared to speak to any slide,
+   starting 21/10/2026 in group-number order.
 
 ---
+
+## DA2 (original submission — kept for history)
 
 ## 1. What we were actually assigned
 
