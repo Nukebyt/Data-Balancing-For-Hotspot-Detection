@@ -11,7 +11,7 @@ const GREY = "555B6E";
 const LIGHTGREY = "F4F5F9";
 const GREEN = "2E7D32";
 
-const GITHUB_URL = "https://github.com/<your-github-username>/Lithography-Hotspot-Detection-G11";
+const GITHUB_URL = "https://github.com/Nukebyt/Data-Balancing-For-Hotspot-Detection";
 
 const STRATS = ["Baseline", "RUS", "ROS", "ROS+Aug", "Bal.Batch", "Combo(50%)", "Combo(25%)", "Combo(B+A)"];
 const STRAT_COLORS = ["8C8C8C", "4C72B0", "55A868", "C44E52", "8172B2", "CCB974", "64B5CD", "E07B39"];
